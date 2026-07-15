@@ -1,41 +1,41 @@
 # aubo_ros2_driver
 
-遨博机器人ROS2驱动
+Aubo Robotics ROS2 driver
 
-## ROS 2 Jazzy 适配状态
+## ROS 2 Jazzy Adaptation Status
 
-当前仓库已经完成 ROS 2 Jazzy 的初步适配，`aubo_ros2_driver`、`aubo_description`、`aubo_moveit_config` 可在 Jazzy 环境下完成基础启动、状态显示、MoveIt 规划与轨迹执行。
+This repository has completed an initial adaptation for ROS 2 Jazzy. `aubo_ros2_driver`, `aubo_description`, and `aubo_moveit_config` can perform basic startup, status display, MoveIt planning, and trajectory execution under the Jazzy environment.
 
-本次适配已处理的关键问题包括：
+Key issues addressed in this adaptation include:
 
-- MoveIt OMPL 规划配置适配 Jazzy 参数格式。
-- MoveIt 控制器管理器参数补齐，支持 `joint_trajectory_controller` 执行。
-- `joint_limits.yaml` 补充加速度限制，修复 `AddTimeOptimalParameterization` 失败问题。
-- `SRDF` 虚拟关节修正为 `world -> base_link`。
-- RViz `Planning Scene Topic` 修正为 `/monitored_planning_scene`，使 MotionPlanning 场景机器人状态可正常刷新。
+- Adapted the MoveIt OMPL planning configuration to the Jazzy parameter format.
+- Completed the MoveIt controller manager parameters to support `joint_trajectory_controller` execution.
+- Added acceleration limits to `joint_limits.yaml`, fixing an `AddTimeOptimalParameterization` failure.
+- Corrected the `SRDF` virtual joint to `world -> base_link`.
+- Fixed the RViz `Planning Scene Topic` to `/monitored_planning_scene`, allowing the MotionPlanning scene's robot state to refresh correctly.
 
-说明：
+Notes:
 
-- 当前文档中的 MoveIt 相关启动方式，均以 Jazzy 适配后的配置为准。
-- 如果是实机调试，仍建议优先完成 URDF 校准后再做 MoveIt 验证。
+- All MoveIt-related launch instructions in this document are based on the Jazzy-adapted configuration.
+- For real hardware debugging, it is still recommended to complete URDF calibration first before performing MoveIt validation.
 
-## 在 rviz 中查看 aubo 机器人模型（以 aubo_i5 为例）
+## Viewing the Aubo Robot Model in RViz (using aubo_i5 as an example)
 
 ```bash
 ros2 launch aubo_description aubo_viewer.launch.py
 ```
 
-## 驱动真实机械臂前建议优先完成 URDF 校准
+## URDF Calibration Is Recommended Before Driving the Real Robot Arm
 
-建议先根据机器人当前控制器返回的校准补偿生成校准版 URDF，再进行实机驱动、MoveIt 规划和轨迹验证。
+It is recommended to first generate a calibrated URDF based on the calibration compensation returned by the robot's current controller, before proceeding with real hardware driving, MoveIt planning, and trajectory validation.
 
-如果直接使用未校准的默认 URDF，可能存在以下风险：
+Using the default, uncalibrated URDF directly may carry the following risks:
 
-- 规划模型与真实机器人运动学参数不一致，末端位姿存在偏差。
-- RViz、MoveIt 中显示的姿态和实机反馈不完全一致，影响问题定位。
-- TCP 验证、轨迹复现、离线点位比对等依赖模型精度的功能，结果可能不可靠。
+- The planning model's kinematic parameters may not match the real robot, causing end-effector pose deviations.
+- The pose shown in RViz/MoveIt may not fully match the real robot feedback, making troubleshooting harder.
+- Functions that depend on model accuracy — such as TCP validation, trajectory reproduction, and offline waypoint comparison — may produce unreliable results.
 
-推荐方法：
+Recommended method:
 
 ```bash
 cd <your_ros2_ws>
@@ -47,16 +47,16 @@ colcon build --packages-select aubo_description
 source install/setup.bash
 ```
 
-说明：
+Notes:
 
-- 生成结果默认写入 `src/aubo_description/urdf/<robot_model>_calibrated.urdf`。
-- `--robot-ip` 需要显式传入。
-- 运行前请确认当前 Python 环境可以导入 `numpy` 和 `pyaubo_sdk`。
-- 生成后需要单独重新编译 `aubo_description` 包。
+- The generated result is written by default to `src/aubo_description/urdf/<robot_model>_calibrated.urdf`.
+- `--robot-ip` must be provided explicitly.
+- Before running, make sure the current Python environment can import `numpy` and `pyaubo_sdk`.
+- After generation, the `aubo_description` package must be rebuilt separately.
 
-## 驱动真实机械臂 aubo_i5（修改机器人对应 `robot_ip`、`aubo_type`）
+## Driving the Real aubo_i5 Robot Arm (adjust `robot_ip` and `aubo_type` for your robot)
 
-终端 1：
+Terminal 1:
 
 ```bash
 cd <your_ros2_ws>
@@ -66,7 +66,7 @@ ros2 launch aubo_ros2_driver aubo_control.launch.py aubo_type:=aubo_i5 robot_ip:
   use_fake_hardware:=false
 ```
 
-终端 2：
+Terminal 2:
 
 ```bash
 cd <your_ros2_ws>
@@ -75,11 +75,11 @@ source install/setup.bash
 ros2 launch aubo_moveit_config aubo_moveit.launch.py aubo_type:=aubo_i5
 ```
 
-在 ROS 2 Jazzy 下，`aubo_moveit.launch.py` 已完成基础适配，可直接用于 RViz + MoveIt 联调。`launch_rviz` 默认为 `true`。
+Under ROS 2 Jazzy, `aubo_moveit.launch.py` has already been adapted and can be used directly for RViz + MoveIt integration testing. `launch_rviz` defaults to `true`.
 
-## 驱动真实机械臂 aubo_i5 单点轨迹执行 demo（修改机器人对应 `robot_ip`、`aubo_type`）
+## Real aubo_i5 Single-Point Trajectory Execution Demo (adjust `robot_ip` and `aubo_type` for your robot)
 
-终端 1：
+Terminal 1:
 
 ```bash
 cd <your_ros2_ws>
@@ -89,7 +89,7 @@ ros2 launch aubo_ros2_driver aubo_control.launch.py aubo_type:=aubo_i5 robot_ip:
   use_fake_hardware:=false
 ```
 
-终端 2：
+Terminal 2:
 
 ```bash
 cd <your_ros2_ws>
@@ -98,9 +98,9 @@ source install/setup.bash
 ros2 launch ros_joints_plan joints_plan.launch.py aubo_type:=aubo_i5
 ```
 
-在 ROS 2 Jazzy 下，`ros_joints_plan` 的 launch 配置也已同步到当前 MoveIt 适配方案。
+Under ROS 2 Jazzy, the launch configuration for `ros_joints_plan` has also been synced with the current MoveIt adaptation.
 
-## 服务节点驱动真实机械臂（修改机器人对应 `robot_ip`）
+## Driving the Real Robot Arm via the Service Node (adjust `robot_ip` for your robot)
 
 ```bash
 cd <your_ros2_ws>
@@ -109,13 +109,13 @@ source install/setup.bash
 ros2 launch aubo_ros2_driver aubo_client.launch.py robot_ip:=127.0.0.1 log_level:=info
 ```
 
-可选参数：
+Optional parameters:
 
-- `port`：TCP 服务端口，默认 `30004`
-- `robot`：机器人前缀，默认 `rob1`
-- `log_level`：日志级别，默认 `info`
+- `port`: TCP service port, defaults to `30004`
+- `robot`: robot name prefix, defaults to `rob1`
+- `log_level`: log level, defaults to `info`
 
-## 调用示例
+## Call Example
 
 ```bash
 cd <your_ros2_ws>
@@ -125,7 +125,7 @@ ros2 service call /jsonrpc_service aubo_msgs/srv/JsonRpc \
 "{cls: 'RobotState', func: 'getTcpPose', params: '[]'}"
 ```
 
-## 响应示例
+## Response Example
 
 ```bash
 requester: making request: aubo_msgs.srv.JsonRpc_Request(cls='RobotState', func='getTcpPose', params='[]')
@@ -134,7 +134,7 @@ response:
 aubo_msgs.srv.JsonRpc_Response(result='[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]', error='None')
 ```
 
-## 异常响应示例（输入错误类 `RobotStat`）
+## Error Response Example (using an incorrect class name `RobotStat`)
 
 ```bash
 requester: making request: aubo_msgs.srv.JsonRpc_Request(cls='RobotStat', func='getTcpPose', params='[]')
@@ -143,6 +143,6 @@ response:
 aubo_msgs.srv.JsonRpc_Response(result='None', error='{"code": -32601, "message": "method not found: rob1.RobotStat.getTcpPose"}')
 ```
 
-## aubo_sdk 接口参考文档
+## aubo_sdk Interface Reference Documentation
 
 [aubo_sdk developer](https://docs.aubo-robotics.cn/arcs_api/index.html)
