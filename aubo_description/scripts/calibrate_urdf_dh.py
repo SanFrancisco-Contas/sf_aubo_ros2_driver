@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-用途
-----
-- 从 URDF 中提取各关节在 q=0 时的 Modified DH 参数。
-- 通过 pyaubo_sdk RPC 获取运动学校准补偿值 (da, dalpha, dd, dtheta)。
-- 将补偿后的结果回写为新的 URDF 文件，默认生成“校准版”文件而不是覆盖原文件。
+Purpose
+-------
+- Extract each joint's Modified DH parameters at q=0 from the URDF.
+- Retrieve kinematic calibration compensation values (da, dalpha, dd, dtheta) via pyaubo_sdk RPC.
+- Write the compensated results back as a new URDF file; by default generates a "calibrated" file instead of overwriting the original.
 
-示例
-----
+Example
+-------
 python3 scripts/calibrate_urdf_dh.py \
   --robot-model aubo_i10H \
   --robot-ip 192.168.15.128 \
@@ -48,10 +48,10 @@ except Exception:
     PYAUBO_SDK_IMPORT_ERROR = sys.exc_info()[1]
 
 
-def format_dependency_error(module_name: str, import_error: Exception | None, hint: str) -> str:
-    parts = ["缺少运行依赖 `{}`。".format(module_name)]
+def format_dependency_error(module_name: str, import_error: Exception, hint: str) -> str:
+    parts = ["Missing runtime dependency `{}`.".format(module_name)]
     if import_error is not None:
-        parts.append("导入错误: {}".format(import_error))
+        parts.append("Import error: {}".format(import_error))
     parts.append(hint)
     return " ".join(parts)
 
@@ -63,7 +63,7 @@ def check_runtime_dependencies():
             format_dependency_error(
                 "numpy",
                 NUMPY_IMPORT_ERROR,
-                "当前环境无法导入 numpy，请先确认运行环境依赖是否齐全。",
+                "The current environment cannot import numpy. Please confirm that the runtime environment's dependencies are complete.",
             )
         )
     if pyaubo_sdk is None:
@@ -71,11 +71,11 @@ def check_runtime_dependencies():
             format_dependency_error(
                 "pyaubo_sdk",
                 PYAUBO_SDK_IMPORT_ERROR,
-                "当前环境无法导入 pyaubo_sdk，请先确认 AUBO Python SDK 是否已正确配置到当前终端环境。",
+                "The current environment cannot import pyaubo_sdk. Please confirm that the AUBO Python SDK has been correctly configured in the current terminal environment.",
             )
         )
     if errors:
-        raise RuntimeError("依赖检查失败:\n- " + "\n- ".join(errors))
+        raise RuntimeError("Dependency check failed:\n- " + "\n- ".join(errors))
 
 
 def rpy_to_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
@@ -152,7 +152,7 @@ def get_joints(root: ET.Element) -> List[Dict]:
     return joints
 
 
-def order_chain(joints: List[Dict], base_link: str | None = None):
+def order_chain(joints: List[Dict], base_link: str = None):
     parent_to_joint = defaultdict(list)
     link_parents = {}
     links = set()
@@ -165,7 +165,7 @@ def order_chain(joints: List[Dict], base_link: str | None = None):
     if base_link is None:
         candidates = [link for link in links if link not in link_parents]
         if not candidates:
-            raise ValueError("无法自动识别 base_link，请显式传入 --base-link。")
+            raise ValueError("Could not automatically identify base_link; please pass --base-link explicitly.")
         base_link = candidates[0]
 
     ordered = []
@@ -220,17 +220,17 @@ def load_deltas_str(delta_input, joints_ordered: List[Dict]) -> Dict[str, Dict[s
     elif isinstance(delta_input, str):
         text = delta_input.strip()
         if not text:
-            raise ValueError("校准补偿为空。")
+            raise ValueError("Calibration compensation is empty.")
         try:
             data = json.loads(text)
         except Exception:
             data = ast.literal_eval(text)
     else:
-        raise TypeError("delta_input 必须是 dict 或 str。")
+        raise TypeError("delta_input must be a dict or str.")
 
     if not isinstance(data, dict):
         raise ValueError(
-            "校准补偿格式错误，应类似 {'a': [...], 'alpha': [...], 'd': [...], 'theta': [...]}。"
+            "Invalid calibration compensation format; it should look like {'a': [...], 'alpha': [...], 'd': [...], 'theta': [...]}."
         )
 
     joint_names = [joint["name"] for joint in joints_ordered if joint["type"] != "fixed"]
@@ -244,7 +244,7 @@ def load_deltas_str(delta_input, joints_ordered: List[Dict]) -> Dict[str, Dict[s
 
     arrays = {key: to_float_list(value) for key, value in data.items() if key in param_map}
     if not arrays:
-        raise ValueError("校准补偿中缺少 a/alpha/d/theta。")
+        raise ValueError("Calibration compensation is missing a/alpha/d/theta.")
 
     deltas = {}
     for index, joint_name in enumerate(joint_names):
@@ -273,7 +273,7 @@ def load_deltas_txt_matrix(path: str, joints_ordered: List[Dict]) -> Dict[str, D
                 matlab_arrays[param_name] = values
 
     if not matlab_arrays:
-        raise ValueError("未在文本文件中读取到校准补偿数组。")
+        raise ValueError("No calibration compensation arrays were read from the text file.")
 
     param_map = {"a": "da", "alpha": "dalpha", "d": "dd", "theta": "dtheta"}
     deltas = {}
@@ -287,7 +287,7 @@ def load_deltas_txt_matrix(path: str, joints_ordered: List[Dict]) -> Dict[str, D
 
 
 def print_modified_dh_params(transforms):
-    print("URDF 当前 Modified DH 参数 (q=0):")
+    print("Current URDF Modified DH parameters (q=0):")
     for rotation, position, name in transforms:
         a_val, alpha, d_val, theta0 = modified_decompose(rotation, position)
         print(
@@ -298,7 +298,7 @@ def print_modified_dh_params(transforms):
 
 
 def print_modified_dh_after_deltas(transforms, deltas: Dict[str, Dict[str, float]]):
-    print("\n应用校准补偿后的 Modified DH 参数 (m/rad):")
+    print("\nModified DH parameters after applying calibration compensation (m/rad):")
     for rotation, position, name in transforms:
         a_val, alpha, d_val, theta0 = modified_decompose(rotation, position)
         delta = deltas.get(name, {})
@@ -312,7 +312,7 @@ def print_modified_dh_after_deltas(transforms, deltas: Dict[str, Dict[str, float
             )
         )
 
-    print("\n应用校准补偿后的 Modified DH 参数 (mm/deg):")
+    print("\nModified DH parameters after applying calibration compensation (mm/deg):")
     for rotation, position, name in transforms:
         a_val, alpha, d_val, theta0 = modified_decompose(rotation, position)
         delta = deltas.get(name, {})
@@ -360,7 +360,7 @@ def resolve_input_urdf(args, package_root: str) -> str:
         return resolve_urdf_candidate(args.urdf_in, package_root)
     if args.robot_model:
         return resolve_urdf_candidate(args.robot_model, package_root)
-    raise ValueError("请至少提供 --robot-model 或 --urdf-in，可直接传入机器人名称。")
+    raise ValueError("Please provide at least --robot-model or --urdf-in; you can pass the robot name directly.")
 
 
 def build_default_output_path(input_urdf: str, package_root: str, suffix: str) -> str:
@@ -380,28 +380,28 @@ def fetch_compensation_from_rpc(args):
     rpc.connect(args.robot_ip, args.robot_port)
     if not rpc.hasConnected():
         raise RuntimeError(
-            "RPC 连接失败: {}:{}".format(args.robot_ip, args.robot_port)
+            "RPC connection failed: {}:{}".format(args.robot_ip, args.robot_port)
         )
-    print("已连接到机器人 RPC: {}:{}".format(args.robot_ip, args.robot_port))
+    print("Connected to robot RPC: {}:{}".format(args.robot_ip, args.robot_port))
 
     rpc.login(args.user, args.password)
     if not rpc.hasLogined():
-        raise RuntimeError("RPC 登录失败: user={}".format(args.user))
-    print("RPC 登录成功。")
+        raise RuntimeError("RPC login failed: user={}".format(args.user))
+    print("RPC login successful.")
 
     robot_names = rpc.getRobotNames()
     if not robot_names:
-        raise RuntimeError("RPC 未返回机器人名称。")
+        raise RuntimeError("RPC did not return a robot name.")
     robot_if = rpc.getRobotInterface(robot_names[0])
     cfg = robot_if.getRobotConfig()
 
     robot_type = cfg.getRobotType()
     robot_subtype = cfg.getRobotSubType()
-    print("机器人 type:", robot_type)
-    print("机器人 subtype:", robot_subtype)
+    print("Robot type:", robot_type)
+    print("Robot subtype:", robot_subtype)
 
     compensation = cfg.getKinematicsCompensate(args.temperature)
-    print("原始校准补偿数据:", compensation)
+    print("Raw calibration compensation data:", compensation)
     return compensation
 
 
@@ -440,42 +440,42 @@ def apply_calibration_to_tree(tree, root, joints_ordered, deltas):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="读取机器人校准补偿并生成新的校准版 URDF 文件。"
+        description="Read the robot's calibration compensation and generate a new calibrated URDF file."
     )
-    parser.add_argument("--robot-model", type=str, default="", help="机器人型号，例如 aubo_i10H。")
+    parser.add_argument("--robot-model", type=str, default="", help="Robot model, e.g. aubo_i10H.")
     parser.add_argument(
         "--urdf-in",
         type=str,
         default="",
-        help="输入 URDF 路径或机器人名称，例如 urdf/aubo_i10H.urdf 或 aubo_i10H。",
+        help="Input URDF path or robot name, e.g. urdf/aubo_i10H.urdf or aubo_i10H.",
     )
     parser.add_argument(
         "--output-path",
         type=str,
         default="",
-        help="输出 URDF 路径。默认生成到 aubo_description/urdf/<robot>_calibrated.urdf。",
+        help="Output URDF path. Defaults to aubo_description/urdf/<robot>_calibrated.urdf.",
     )
     parser.add_argument(
         "--output-suffix",
         type=str,
         default="_calibrated",
-        help="默认输出文件后缀，默认值为 _calibrated。",
+        help="Default output file suffix; defaults to _calibrated.",
     )
-    parser.add_argument("--base-link", type=str, default="", help="可选，显式指定 base link 名称。")
-    parser.add_argument("--temperature", type=float, default=20.0, help="获取校准补偿时使用的温度。")
-    parser.add_argument("--robot-ip", type=str, required=True, help="机器人 RPC IP，必须显式传入。")
-    parser.add_argument("--robot-port", type=int, default=30004, help="机器人 RPC 端口。")
-    parser.add_argument("--user", type=str, default="aubo", help="机器人 RPC 用户名。")
-    parser.add_argument("--password", type=str, default="123456", help="机器人 RPC 密码。")
+    parser.add_argument("--base-link", type=str, default="", help="Optional; explicitly specify the base link name.")
+    parser.add_argument("--temperature", type=float, default=20.0, help="Temperature used when fetching the calibration compensation.")
+    parser.add_argument("--robot-ip", type=str, required=True, help="Robot RPC IP; must be provided explicitly.")
+    parser.add_argument("--robot-port", type=int, default=30004, help="Robot RPC port.")
+    parser.add_argument("--user", type=str, default="aubo", help="Robot RPC username.")
+    parser.add_argument("--password", type=str, default="123456", help="Robot RPC password.")
     parser.add_argument(
         "--skip-dependency-check",
         action="store_true",
-        help="跳过启动时的依赖检查，不推荐，通常仅用于调试。",
+        help="Skip the dependency check at startup; not recommended, usually for debugging only.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="允许覆盖已存在的输出文件；默认禁止覆盖，避免误改原始文件。",
+        help="Allow overwriting an existing output file; overwriting is disabled by default to avoid accidentally modifying the original file.",
     )
     return parser.parse_args()
 
@@ -488,7 +488,7 @@ def main():
     package_root = infer_package_root()
     input_urdf = resolve_input_urdf(args, package_root)
     if not os.path.isfile(input_urdf):
-        raise FileNotFoundError("输入 URDF 不存在: {}".format(input_urdf))
+        raise FileNotFoundError("Input URDF does not exist: {}".format(input_urdf))
 
     output_path = args.output_path.strip()
     if output_path:
@@ -497,18 +497,18 @@ def main():
         output_path = build_default_output_path(input_urdf, package_root, args.output_suffix)
 
     if os.path.abspath(output_path) == os.path.abspath(input_urdf):
-        raise ValueError("输出文件不能与输入 URDF 相同，请生成新的校准文件。")
+        raise ValueError("The output file cannot be the same as the input URDF; please generate a new calibration file.")
     if os.path.exists(output_path) and not args.force:
         raise FileExistsError(
-            "输出文件已存在: {}。如需覆盖，请显式传入 --force。".format(output_path)
+            "Output file already exists: {}. To overwrite, pass --force explicitly.".format(output_path)
         )
 
     tree, root = parse_urdf(input_urdf)
-    print("已加载 URDF:", input_urdf)
+    print("Loaded URDF:", input_urdf)
 
     joints = get_joints(root)
     joints_ordered, base_link = order_chain(joints, args.base_link or None)
-    print("识别到 base_link:", base_link)
+    print("Identified base_link:", base_link)
 
     transforms = extract_transforms(joints_ordered)
     print_modified_dh_params(transforms)
@@ -520,8 +520,8 @@ def main():
     apply_calibration_to_tree(tree, root, joints_ordered, deltas)
     ensure_parent_dir(output_path)
     tree.write(output_path, encoding="utf-8", xml_declaration=True)
-    print("\n已生成校准版 URDF:", output_path)
-    print("请重新执行 `colcon build --packages-select aubo_description`，使新生成的 URDF 被安装到工作空间。")
+    print("\nGenerated calibrated URDF:", output_path)
+    print("Please re-run `colcon build --packages-select aubo_description` so the newly generated URDF is installed into the workspace.")
 
 
 if __name__ == "__main__":
